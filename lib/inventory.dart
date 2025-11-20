@@ -1,11 +1,12 @@
-// ignore_for_file: use_build_context_synchronously
+// File: inventory.dart
+
+// ignore_for_file: unused_import, use_build_context_synchronously
 
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-// ignore: unused_import
 import 'package:csv/csv.dart';
 import 'package:http/http.dart' as http;
 
@@ -63,7 +64,8 @@ class _InventoryPageState extends State<InventoryPage> {
   Future<void> _fetchProducts() async {
     if (widget.storeId.isEmpty) return;
     setState(() => loading = true);
-    final String apiUrl = "http://localhost:8000/inventory/${widget.storeId}/products";
+    final String apiUrl = "http://192.168.42.146:8000/inventory/${widget.storeId}/products";
+
     try {
       final response = await http.get(Uri.parse(apiUrl));
       if (response.statusCode == 200) {
@@ -86,7 +88,8 @@ class _InventoryPageState extends State<InventoryPage> {
   List<Map<String, dynamic>> get filteredProducts {
     final q = searchQuery.trim().toLowerCase();
     return products.where((p) {
-      final matchesSearch = q.isEmpty || p["name"].toString().toLowerCase().contains(q);
+      // FIX: Check for "name" (the key we fixed in the backend)
+      final matchesSearch = q.isEmpty || p["name"].toString().toLowerCase().contains(q); 
       final matchesCategory = selectedFilterCategory == "All" || p["category"] == selectedFilterCategory;
       return matchesSearch && matchesCategory;
     }).toList();
@@ -134,6 +137,7 @@ class _InventoryPageState extends State<InventoryPage> {
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
                     children: [
+                      // ... (existing filter/search Row)
                       Row(
                         children: [
                           Container(
@@ -240,6 +244,26 @@ class _InventoryPageState extends State<InventoryPage> {
                                                     style: const TextStyle(fontSize: 12, color: Colors.black87),
                                                   ),
                                                 ),
+                                                
+                                                // 🌟 ADDED: Sub-Category Badge
+                                                if (product["subcategory"] != null && product["subcategory"].isNotEmpty)
+                                                  Padding(
+                                                    padding: const EdgeInsets.only(top: 4.0),
+                                                    child: Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.deepPurple.shade100,
+                                                        borderRadius: BorderRadius.circular(8),
+                                                        border: Border.all(color: Colors.deepPurple.shade200),
+                                                      ),
+                                                      child: Text(
+                                                        product["subcategory"],
+                                                        style: const TextStyle(fontSize: 12, color: Colors.deepPurple),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                // 🌟 END ADDED
+                                                
                                               ],
                                             ),
                                           ),
@@ -294,7 +318,8 @@ class _InventoryPageState extends State<InventoryPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text("MRP: ₹${product["mrp"]} | MSP: ₹${product["msp"]}", style: const TextStyle(fontSize: 12)),
-          Text("Qty: ${product["qty"]} units", style: const TextStyle(fontSize: 12)),
+          // FIX: Use "qty" key as fixed in the backend
+          Text("Qty: ${product["qty"]} units", style: const TextStyle(fontSize: 12)), 
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -315,22 +340,21 @@ class _InventoryPageState extends State<InventoryPage> {
       ),
     );
   }
+
   Widget _editPanel(Map<String, dynamic> product, bool isAdding) {
-    final nameController = TextEditingController(text: product["name"] ?? "");
+    // FIX: Using base keys like 'name' and 'qty' from the frontend view, but the payload will be mapped later
+    final nameController = TextEditingController(text: product["name"] ?? ""); 
     final mrpController = TextEditingController(text: product["mrp"]?.toString() ?? "");
     final mspController = TextEditingController(text: product["msp"]?.toString() ?? "");
-    final qtyController = TextEditingController(text: product["qty"]?.toString() ?? "");
-    final String productCategory = product["category"] ?? categories.first;
-    String selectedCategory = _mapToBroadCategory(productCategory);
-    if (!categories.contains(selectedCategory)) {
-      selectedCategory = categories.first;
-    }
+    final qtyController = TextEditingController(text: product["qty"]?.toString() ?? ""); 
+    final subcategoryController = TextEditingController(text: product["subcategory"] ?? "");
+    String selectedCategory = product["category"] ?? categories.first;
 
     return SafeArea(
       child: Container(
         decoration: BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Colors.grey.shade300))),
         padding: const EdgeInsets.all(16),
-        height: 360,
+        height: 420, 
         width: double.infinity,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -344,11 +368,12 @@ class _InventoryPageState extends State<InventoryPage> {
                   _buildTextField("MRP", mrpController),
                   _buildTextField("MSP", mspController),
                   _buildTextField("Quantity", qtyController),
+                  _buildTextField("Sub-Category", subcategoryController),
                   DropdownButtonFormField<String>(
-                    initialValue: selectedCategory, 
+                    initialValue: selectedCategory,
                     items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                     onChanged: (val) {
-                      selectedCategory = val!; 
+                      selectedCategory = val!;
                     },
                     decoration: const InputDecoration(labelText: "Category", border: OutlineInputBorder()),
                   ),
@@ -359,21 +384,40 @@ class _InventoryPageState extends State<InventoryPage> {
               alignment: Alignment.bottomRight,
               child: ElevatedButton(
                 onPressed: () async {
-                  final newProduct = {
-                    "name": nameController.text.trim(),
-                    "status": "In Stock",
-                    "demand": "Moderate",
+                  // --- START FIX: Adjust payload keys to match FastAPI schemas ---
+                  
+                  // Base payload using keys expected by ProductUpdate schema (used by PATCH)
+                  final basePayload = {
+                    "product_name": nameController.text.trim(),   // Fix for all
                     "mrp": double.tryParse(mrpController.text) ?? 0,
                     "msp": double.tryParse(mspController.text) ?? 0,
-                    "qty": int.tryParse(qtyController.text) ?? 0,
+                    "stock_quantity": int.tryParse(qtyController.text) ?? 0, // Fix for all
                     "category": selectedCategory,
+                    "subcategory": subcategoryController.text.trim(), // Key used by ProductUpdate
                   };
 
-                  if (isAdding) {
-                    await _addProductToAPI(newProduct);
-                  } else {
-                    await _updateProductToAPI(product["id"].toString(), newProduct);
+                  if (kDebugMode) {
+                    print("Sending payload: ${jsonEncode(basePayload)}");
                   }
+                  
+                  if (isAdding) {
+                    // FIX for POST: ProductCreate schema expects 'subcategory' (snake_case)
+                    final createPayload = Map<String, dynamic>.from(basePayload);
+                    final subcategoryValue = createPayload.remove('subcategory');
+                    createPayload['subcategory'] = subcategoryValue; // Map to snake_case
+                    
+                    await _addProductToAPI(createPayload);
+                    
+                  } else {
+                    // FIX for PATCH: The basePayload is already correct for ProductUpdate
+                    await _updateProductToAPI(product["id"].toString(), basePayload);
+                  }
+                  // --- END FIX ---
+
+                  setState(() {
+                    addingNew = false;
+                    editingIndex = null;
+                  });
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple, foregroundColor: Colors.white),
                 child: Text(isAdding ? "Add Product" : "Save Changes"),
@@ -384,31 +428,11 @@ class _InventoryPageState extends State<InventoryPage> {
       ),
     );
   }
-  String _mapToBroadCategory(String productCategory) {
-    final broadCategories = ["Clothing", "Stationary", "Home & Grocery", "Books", "Electronics", "Others"];
-    final cat = productCategory.toLowerCase().trim();
-    if (["kurthi", "lehengas", "suits", "sweaters", "socks", "jeans", "shrugs", "mens tee", "tops", "trousers", "nightpants", "sports wear", "nightwear", "patyala"].contains(cat)) {
-      return "Clothing";
-    }
-    if (["files", "a4 papers", "tapes", "calculators", "pens", "stapler", "double punch", "gum bottle", "plastic scale", "notebooks", "registers", "stamps", "envelops", "highlighters", "pencils", "notepads", "diaries", "scissors", "rulers", "arts"].contains(cat)) {
-      return "Stationary";
-    }
-    if (["novels", "history books", "law books", "mythology", "story books", "upsc", "gate", "barc", "jee", "neet", "ntse", "olympiad", "government text books", "reasoning", "engeneering mathematics", "computer architecture", "python", "c", "java", "dbms"].contains(cat)) {
-      return "Books";
-    }
-    if (["washing machine", "ac", "camera", "audio supplies", "video supplies", "fridge", "routers", "setup boxes", "inverters", "generators", "hair supplies", "electric kettle", "sewing machine", "gaming supplies", "cables", "mobile appliances", "geysers", "heaters", "sensors"].contains(cat)) {
-      return "Electronics";
-    }
-    if (["spice and condiments", "beverages", "dishwashers", "soaps", "ditergents", "decerative accessories", "skincare", "haircare", "toys", "groceries", "staple foods", "snacks", "diary products", "hygine products", "accessories", "petcare products", "kitchen ware", "households", "umbrella", "gardening supplies"].contains(cat)) {
-      return "Home & Grocery";
-    }
-    if (broadCategories.contains(productCategory)) {
-      return productCategory;
-    }
-    return "Others";
-  }
+
+  // FIX: This function now receives the corrected payload from _editPanel
   Future<void> _addProductToAPI(Map<String, dynamic> product) async {
-    final String apiUrl = "http://localhost:8000/inventory/${widget.storeId}/products";
+    final String apiUrl = "http://192.168.42.146:8000/products/${widget.storeId}/"; // NOTE: Should use /products/{store_id}/
+    
     try {
       final response = await http.post(Uri.parse(apiUrl),
           headers: {"Content-Type": "application/json"}, body: jsonEncode(product));
@@ -423,26 +447,24 @@ class _InventoryPageState extends State<InventoryPage> {
     }
   }
 
+  // FIX: This function now uses the correct method and URL
   Future<void> _updateProductToAPI(String productId, Map<String, dynamic> updated) async {
-    final String apiUrl = "http://localhost:8000/inventory/${widget.storeId}/$productId";
+    // FIX 1: Correct the API URL to include productId
+    final String apiUrl = "http://192.168.42.146:8000/inventory/${widget.storeId}/$productId"; 
+    
     try {
-      // FIX: Changed http.put to http.patch to match the FastAPI route
-      final response = await http.patch(Uri.parse(apiUrl),
+      // FIX 2: Change from http.put to http.patch to match the FastAPI router
+      final response = await http.patch(Uri.parse(apiUrl), // CHANGED: put -> patch
           headers: {"Content-Type": "application/json"}, body: jsonEncode(updated));
-          
       if (response.statusCode == 200) {
-        // Assuming a 200 status code means success (FastAPI @router.patch returns 200)
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("✅ Updated successfully")));
         _fetchProducts();
       } else {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text("❌ Failed: ${response.statusCode}")));
-        // Log the full error response for debugging if needed
-        if (kDebugMode) print("Update failed response body: ${response.body}"); 
       }
     } catch (e) {
       if (kDebugMode) print("Error updating: $e");
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("❌ Network Error during update")));
     }
   }
 
@@ -450,18 +472,60 @@ class _InventoryPageState extends State<InventoryPage> {
     if (widget.storeId.isEmpty) return;
     FilePickerResult? result =
         await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['csv']);
-    if (result != null && result.files.single.path != null) {
-      File file = File(result.files.single.path!);
-      final uri = Uri.parse("http://localhost:8000/inventory/${widget.storeId}/upload_csv");
+    
+    // Check if a file was picked
+    if (result != null) {
+      final PlatformFile platformFile = result.files.single;
+      
+      final uri = Uri.parse("http://192.168.42.146:8000/inventory/${widget.storeId}/upload_csv");
+      
       var request = http.MultipartRequest('POST', uri);
-      request.files.add(await http.MultipartFile.fromPath('file', file.path));
-      var response = await request.send();
-      if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("✅ CSV Uploaded")));
-        _fetchProducts();
-      } else {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text("❌ Upload failed: ${response.statusCode}")));
+      
+      try {
+        http.MultipartFile multipartFile;
+        
+        // FIX: Use conditional logic to handle web (kIsWeb) vs mobile/desktop
+        if (kIsWeb) {
+          // WEB: Use fromBytes and the bytes property
+          if (platformFile.bytes == null) {
+            throw Exception("File data is null, cannot upload.");
+          }
+          multipartFile = http.MultipartFile.fromBytes(
+            'file', 
+            platformFile.bytes!, 
+            filename: platformFile.name,
+          );
+        } else {
+          // MOBILE/DESKTOP: Use fromPath and the path property
+          if (platformFile.path == null) {
+             throw Exception("File path is null, cannot upload.");
+          }
+          // The original code was: File file = File(result.files.single.path!);
+          multipartFile = await http.MultipartFile.fromPath(
+            'file', 
+            // We still need the dart:io.File path for fromPath, though path is available on platformFile
+            File(platformFile.path!).path, 
+            filename: platformFile.name,
+          );
+        }
+        
+        request.files.add(multipartFile);
+        var response = await request.send();
+        
+        // Ensure response is fully read to avoid issues, especially on upload
+        final responseBody = await response.stream.bytesToString();
+        if (kDebugMode) print("Upload Response: ${response.statusCode} - $responseBody");
+
+        if (response.statusCode == 200) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("✅ CSV Uploaded")));
+          _fetchProducts();
+        } else {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text("❌ Upload failed: ${response.statusCode}")));
+        }
+      } catch (e) {
+        if (kDebugMode) print("Upload Error: $e");
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("❌ Upload error: ${e.toString()}")));
       }
     }
   }
