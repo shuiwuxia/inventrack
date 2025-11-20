@@ -2,7 +2,10 @@
 
 // ignore_for_file: use_build_context_synchronously
 
+import 'dart:convert';
+import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'login_screen.dart'; 
 
@@ -32,16 +35,22 @@ class Product {
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
+    final random = Random();
+    final category = json['category'] as String?;
+    
+    // Set distance based on category as requested
+    double distance = (category == 'Clothing') ? 0.5 : double.parse((random.nextDouble() * 10 + 1).toStringAsFixed(1));
+
     return Product(
-      name: json['name'] ?? '',
-      storeName: json['storeName'] ?? '',
-      rating: (json['rating'] ?? 0.0).toDouble(),
+      name: json['name'] ?? 'Unknown Product',
+      storeName: json['category'] ?? 'Uncategorized', // Use category as store name for display
+      rating: double.parse((random.nextDouble() * 2.0 + 3.0).toStringAsFixed(1)), // Generate random rating 3.0-5.0
       mrp: (json['mrp'] ?? 0.0).toDouble(),
-      imageUrl: json['imageUrl'] ?? '',
-      distance: (json['distance'] ?? 0.0).toDouble(),
-      stockQuantity: json['stockQuantity'] ?? 0,
-      isLowStock: json['isLowStock'] ?? false,
-      isHighDemand: json['isHighDemand'] ?? false,
+      imageUrl: '', // API does not provide an image URL
+      distance: distance,
+      stockQuantity: random.nextInt(100) + 1, // Generate random stock 1-100
+      isLowStock: random.nextBool(), // Generate random status
+      isHighDemand: random.nextBool(), // Generate random status
     );
   }
 }
@@ -55,8 +64,8 @@ class Shop {
 
   factory Shop.fromJson(Map<String, dynamic> json) {
     return Shop(
-      name: json['name'] ?? '',
-      address: json['address'] ?? '',
+      name: json['name'] ?? 'Unknown Shop',
+      address: json['address'] ?? 'No address',
       distance: (json['distance'] ?? 0.0).toDouble(),
     );
   }
@@ -136,7 +145,6 @@ class CartModel extends ChangeNotifier {
 final CartModel cartModel = CartModel();
 
 class ApiService {
-  static const String baseUrl = 'http://your-backend-url.com/api';
   static const String mockAuthToken = 'mock-jwt-token-for-demo'; 
 
   static Map<String, String> get headers => {
@@ -149,19 +157,41 @@ class ApiService {
     return []; 
   }
 
+  // --- MODIFIED: Implemented to fetch live product data ---
   static Future<List<Product>> fetchProducts({String? searchQuery, bool? onlyLowStock, bool? onlyHighDemand}) async {
-    await Future.delayed(const Duration(milliseconds: 500)); 
-    return []; 
+    final url = Uri.parse('http://192.168.42.146:8000/products/all');
+   
+    try {
+      final response = await http.get(url, headers: headers);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as List;
+        return data.map((item) => Product.fromJson(item)).toList();
+      } else {
+        debugPrint('Failed to load products: ${response.statusCode}');
+        return []; // Return empty list on failure
+      }
+    } catch (e) {
+      debugPrint('Error fetching products: $e');
+      return [];
+    }
   }
 
+  // --- MODIFIED: Implemented to fetch live shop data ---
   static Future<List<Shop>> fetchShops() async {
-    await Future.delayed(const Duration(milliseconds: 500)); 
-    return []; 
+    final url = Uri.parse('http://192.168.42.146:8000/shops/all');
+   
+    try {
+      final response = await http.get(url, headers: headers);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as List;
+        return data.map((item) => Shop.fromJson(item)).toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
   }
 }
-
-// --- HOME SCREEN ---
-
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
   @override
@@ -170,10 +200,11 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
-  List<Product> _products = [];
+  List<Product> _allProducts = []; // List to hold ALL fetched products
   List<Shop> _shops = [];
-  final int _notificationCount = 3; 
-  final List<String> _categories = const ['Electronics', 'Clothing', 'Books', 'Retail Shop', 'Stationary'];
+  final int _notificationCount = 3;
+  List<String> _categories = []; // Will be populated from fetched products
+  String? _selectedCategory; // To track the active category filter
   bool _isLoading = true;
   bool _locationAccessGranted = false; 
 
@@ -222,42 +253,61 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() => _locationAccessGranted = false);
       }
     } else {
-       // Assuming permission is granted if prompted before
-       setState(() => _locationAccessGranted = true);
+        // Assuming permission is granted if prompted before
+        setState(() => _locationAccessGranted = true);
     }
   }
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     
-    await Future.delayed(const Duration(milliseconds: 500)); 
-
     try {
-      final products = await ApiService.fetchProducts(onlyLowStock: true); 
+      // Fetch ALL products for the main consumer view
+      final products = await ApiService.fetchProducts(); 
       final shops = await ApiService.fetchShops();
 
       setState(() {
-        _products = products.isEmpty ? _getMockProducts() : products;
+        _allProducts = products.isEmpty ? _getMockAllProducts() : products;
         _shops = shops.isEmpty ? _getMockShops() : shops;
+
+        // --- MODIFIED: Dynamically generate categories from products ---
+        _categories = ['All', ..._allProducts.map((p) => p.storeName).toSet()];
+        _selectedCategory = 'All'; // Default to show all products
+
         _isLoading = false;
+        // Sort shops by nearest distance
         _shops.sort((a, b) => a.distance.compareTo(b.distance)); 
+        // Sort products by nearest distance
+        _allProducts.sort((a, b) => a.distance.compareTo(b.distance)); 
       });
     } catch (e) {
       setState(() {
-        _products = _getMockProducts();
-        _shops = _getMockShops();
+        _allProducts = _getMockAllProducts(); // Fallback to mock data on error
+        _shops = _getMockShops(); // Fallback to mock data on error
+
+        // Also generate categories for mock data
+        _categories = ['All', ..._allProducts.map((p) => p.storeName).toSet()];
+        _selectedCategory = 'All';
+
         _isLoading = false;
+        // Also sort mock data
         _shops.sort((a, b) => a.distance.compareTo(b.distance)); 
+        _allProducts.sort((a, b) => a.distance.compareTo(b.distance));
       });
       debugPrint('Error loading data, using mock: $e');
     }
   }
   
-  List<Product> _getMockProducts() {
+  // New mock data function to simulate a larger product catalog
+  List<Product> _getMockAllProducts() {
     return [
-      Product(name: 'Wireless Mouse', storeName: 'Tech Hub', rating: 4.5, mrp: 29.99, imageUrl: 'https://placehold.co/60x60/87CEEB/FFFFFF?text=Mouse', distance: 1.2, stockQuantity: 5, isLowStock: true, isHighDemand: false),
-      Product(name: 'Denim Jeans', storeName: 'Fashion Co.', rating: 4.0, mrp: 59.99, imageUrl: 'https://placehold.co/60x60/F08080/FFFFFF?text=Jeans', distance: 3.5, stockQuantity: 200, isLowStock: false, isHighDemand: true),
-      Product(name: 'Adventure Book', storeName: 'Read World', rating: 4.9, mrp: 15.50, imageUrl: 'https://placehold.co/60x60/90EE90/FFFFFF?text=Book', distance: 0.8, stockQuantity: 12, isLowStock: false, isHighDemand: false),
+      Product(name: 'Wireless Mouse (Logitech)', storeName: 'Tech Hub', rating: 4.5, mrp: 29.99, imageUrl: 'https://placehold.co/60x60/87CEEB/FFFFFF?text=Mouse', distance: 1.2, stockQuantity: 5, isLowStock: true, isHighDemand: false),
+      Product(name: 'Blue Denim Jeans', storeName: 'Fashion Co.', rating: 4.0, mrp: 59.99, imageUrl: 'https://placehold.co/60x60/F08080/FFFFFF?text=Jeans', distance: 3.5, stockQuantity: 200, isLowStock: false, isHighDemand: true),
+      Product(name: 'Fantasy Adventure Book', storeName: 'Read World', rating: 4.9, mrp: 15.50, imageUrl: 'https://placehold.co/60x60/90EE90/FFFFFF?text=Book', distance: 0.8, stockQuantity: 12, isLowStock: false, isHighDemand: false),
+      Product(name: 'Mechanical Keyboard', storeName: 'Tech Hub', rating: 4.8, mrp: 120.00, imageUrl: 'https://placehold.co/60x60/87CEEB/FFFFFF?text=Keyboard', distance: 5.0, stockQuantity: 3, isLowStock: true, isHighDemand: true),
+      Product(name: 'A4 Notebook', storeName: 'Campus Supplies', rating: 4.1, mrp: 3.99, imageUrl: 'https://placehold.co/60x60/FFD700/000000?text=Note', distance: 0.3, stockQuantity: 50, isLowStock: false, isHighDemand: false),
+      Product(name: 'White T-Shirt', storeName: 'Fashion Co.', rating: 3.9, mrp: 19.99, imageUrl: 'https://placehold.co/60x60/F08080/FFFFFF?text=Tshirt', distance: 2.1, stockQuantity: 10, isLowStock: true, isHighDemand: false),
+      Product(name: 'Ergonomic Chair', storeName: 'Main Warehouse', rating: 4.6, mrp: 250.00, imageUrl: 'https://placehold.co/60x60/98FB98/000000?text=Chair', distance: 0.5, stockQuantity: 15, isLowStock: false, isHighDemand: true),
     ];
   }
 
@@ -273,7 +323,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final screens = [
-      _buildHomeContent(),
+      _buildHomeContent(), // This now shows all products
       const SearchScreen(query: 'all'),
       const CartScreen(), 
       const ProfileScreen(),
@@ -310,9 +360,9 @@ class _HomeScreenState extends State<HomeScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : IndexedStack(
-                index: _currentIndex,
-                children: screens,
-              ),
+              index: _currentIndex,
+              children: screens,
+            ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
@@ -330,6 +380,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHomeContent() {
+    // Separate the low stock products for the highlighted section
+    final lowStockProducts = _allProducts.where((p) => p.isLowStock).toList();
+
+    // --- MODIFIED: Filter products based on the selected category ---
+    final filteredProducts = _selectedCategory == null || _selectedCategory == 'All'
+        ? _allProducts
+        // Note: We are using `storeName` as it holds the category from the API
+        : _allProducts.where((p) => p.storeName == _selectedCategory).toList();
+    
     return RefreshIndicator(
       onRefresh: _loadData,
       child: SingleChildScrollView(
@@ -338,6 +397,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 1. Search Bar (Directly navigates to SearchScreen)
             Card(
               child: TextField(
                 decoration: InputDecoration(
@@ -349,11 +409,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   filled: true,
                 ),
                 onSubmitted: (query) {
-                  setState(() => _currentIndex = 1); 
+                  // Navigate to the search screen with the query, then switch tab
+                  if (query.isNotEmpty) {
+                    Navigator.of(context).push(MaterialPageRoute(builder: (context) => SearchScreen(query: query)));
+                  }
                 },
               ),
             ),
             const SizedBox(height: 16),
+            
+            // 2. Categories
             const Text('Categories', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             SizedBox(
@@ -365,30 +430,50 @@ class _HomeScreenState extends State<HomeScreen> {
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: ChoiceChip(
+                      labelStyle: TextStyle(color: _selectedCategory == _categories[index] ? Colors.white : Colors.black),
+                      backgroundColor: Colors.grey[200],
+                      selectedColor: Theme.of(context).colorScheme.primary,
                       label: Text(_categories[index]),
-                      onSelected: (_) => ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('${_categories[index]} selected')),
-                      ), selected: false,
+                      selected: _selectedCategory == _categories[index],
+                      onSelected: (isSelected) {
+                        setState(() => _selectedCategory = isSelected ? _categories[index] : null);
+                      },
                     ),
                   );
                 },
               ),
             ),
             const SizedBox(height: 16),
+            
+            // 3. Nearest Shops
             Text('Nearest Shops ${_locationAccessGranted ? '(Location Enabled)' : '(Location Disabled)'}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: _shops.length,
+              itemCount: _shops.length > 3 ? 3 : _shops.length, // Show only top 3 shops
               itemBuilder: (context, index) => _buildShopCard(_shops[index]),
             ),
             const SizedBox(height: 16),
-            const Text('Low Stock Products', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            
+            // 4. Low Stock/Highlighted Products (Optional Section)
+            if (lowStockProducts.isNotEmpty) ...[
+              const Text('⚠️ Low Stock Alert', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange)),
               ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: lowStockProducts.length > 3 ? 3 : lowStockProducts.length, // Show top 3 low stock
+                itemBuilder: (context, index) => ProductCard(product: lowStockProducts[index]),
+              ),
+              const SizedBox(height: 16),
+            ],
+            
+            // 5. ALL Products (The primary consumer catalogue)
+            const Text('All Products', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            filteredProducts.isEmpty ? const Padding(padding: EdgeInsets.all(16.0), child: Center(child: Text("No products found in this category."))) : ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: _products.length,
-              itemBuilder: (context, index) => ProductCard(product: _products[index]),
+              itemCount: filteredProducts.length,
+              itemBuilder: (context, index) => ProductCard(product: filteredProducts[index]),
             ),
           ],
         ),
@@ -1211,4 +1296,3 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 }
-

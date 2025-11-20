@@ -7,6 +7,9 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'login_screen.dart';
 import 'inventory.dart';
+import 'pos.dart';
+import 'analysis.dart';
+
 void main() {
   runApp(const RetailApp());
 }
@@ -87,7 +90,8 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false;
 
   Future<void> _login() async {
-    const String apiUrl = "http://127.0.0.1:8000/auth/login"; // FastAPI endpoint 
+    const String apiUrl = "http://192.168.42.146:8000/auth/login"; // FastAPI endpoint 
+   
 
     setState(() => _isLoading = true);
 
@@ -213,7 +217,8 @@ class _SignupPageState extends State<SignupPage> {
 
     setState(() => _isLoading = true);
 
-    final url = Uri.parse("http://127.0.0.1:8000/auth/register/shopkeeper"); // FastAPI endpoint
+    final url = Uri.parse("http://192.168.42.146:8000/auth/register/shopkeeper"); // FastAPI endpoint
+    
 
     final body = {
       "shop_name": _shopName.text.trim(),
@@ -522,13 +527,13 @@ class _DashboardPageState extends State<DashboardPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.sync),
-            tooltip: 'Sync with Zoho (placeholder)',
+            tooltip: 'refresh',
             onPressed: () => showDialog(
               context: context,
               builder: (_) => AlertDialog(
-                title: const Text('Zoho Integration'),
+                title: const Text('refresh'),
                 content: const Text(
-                    'Zoho sync placeholder. Implement API integration here.'),
+                    'refresh'),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(context),
@@ -583,19 +588,39 @@ class PrimaryDashboardWidget extends StatelessWidget {
         children: [
           Text('Primary Dashboard', style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 12),
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Expanded(flex: 3, child: Column(children: [
-              _revenueCard(context),
-              const SizedBox(height: 12),
-              _productOverviewCard(context),
-            ])),
-            const SizedBox(width: 12),
-            Expanded(flex: 2, child: Column(children: [
-              _alertsCard(context),
-              const SizedBox(height: 12),
-              _forecastCard(context),
-            ])),
-          ]),
+          // Use LayoutBuilder to create a responsive layout
+          LayoutBuilder(
+            builder: (context, constraints) {
+              // Use a Column for narrow screens (mobile)
+              if (constraints.maxWidth < 600) {
+                return Column(
+                  children: [
+                    _revenueCard(context),
+                    const SizedBox(height: 12),
+                    _productOverviewCard(context),
+                    const SizedBox(height: 12),
+                    _alertsCard(context),
+                    const SizedBox(height: 12),
+                    _forecastCard(context),
+                  ],
+                );
+              }
+              // Use a Row for wider screens (tablet/desktop)
+              return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(flex: 3, child: Column(children: [
+                  _revenueCard(context),
+                  const SizedBox(height: 12),
+                  _productOverviewCard(context),
+                ])),
+                const SizedBox(width: 12),
+                Expanded(flex: 2, child: Column(children: [
+                  _alertsCard(context),
+                  const SizedBox(height: 12),
+                  _forecastCard(context),
+                ])),
+              ]);
+            },
+          ),
           const SizedBox(height: 20),
           Card(
             child: Padding(
@@ -670,7 +695,6 @@ class PrimaryDashboardWidget extends StatelessWidget {
     final alerts = [
       {'title': 'Low Stock Alert', 'subtitle': 'Whole Wheat Bread is running low (5 remaining)'},
       {'title': 'Seasonal Forecast', 'subtitle': 'Ice cream demand expected to increase by 30% next week.'},
-      {'title': 'Order Completed', 'subtitle': 'Your supply order #4562 has been delivered.'},
     ];
     return Card(
       child: Padding(
@@ -713,12 +737,20 @@ class POSWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Text(
-        "POS page (content will be added later)",
-        style: Theme.of(context)
-            .textTheme
-            .bodyMedium!
-            .copyWith(color: Colors.grey[600]),
+      child: TextButton(
+        onPressed: () { 
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => POS()),
+          );
+        },
+        child: Text(
+          'Go to pos',
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium!
+              .copyWith(color: const Color.fromARGB(255, 78, 78, 78)),
+        ),
       ),
     );
   }
@@ -758,38 +790,89 @@ class InventoryWidget extends StatelessWidget {
   }
 }
 
-// ------------------------------ NOTIFICATIONS PAGE ------------------------------
-
-class NotificationsWidget extends StatelessWidget {
+class NotificationsWidget extends StatefulWidget {
   const NotificationsWidget({super.key});
+
   @override
-  Widget build(BuildContext context) {
-    final alerts = [
-      {'title': 'Low Stock Alert', 'subtitle': 'Whole Wheat Bread running low (5 remaining)', 'time': '2 hours ago'},
-      {'title': 'Seasonal Forecast', 'subtitle': 'Ice cream demand expected to increase by 30% next week.', 'time': '1 day ago'},
-      {'title': 'Order Completed', 'subtitle': 'Your supply order #4562 has been delivered.', 'time': '2 days ago'},
-    ];
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Notifications', style: Theme.of(context).textTheme.headlineMedium),
-      const SizedBox(height: 12),
-      Card(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(children: [
-            for (var a in alerts)
-              ListTile(
-                leading: const Icon(Icons.notifications),
-                title: Text(a['title']!),
-                subtitle: Text('${a['subtitle']} • ${a['time']}'),
-                trailing: PopupMenuButton(itemBuilder: (_) => [const PopupMenuItem(value: 'read', child: Text('Mark read')), const PopupMenuItem(value: 'delete', child: Text('Delete'))]),
-              )
-          ]),
-        ),
-      )
-    ]);
-  }
+  State<NotificationsWidget> createState() => _NotificationsWidgetState();
 }
 
+class _NotificationsWidgetState extends State<NotificationsWidget> {
+  // Low stock notifications
+  List<Map<String, dynamic>> alerts = [
+    {
+      'title': 'Low Stock Alert',
+      'subtitle': 'Product P0011 is running low (5 remaining)',
+      'time': 'Just now',
+      'read': false
+    },
+    {
+      'title': 'Low Stock Alert',
+      'subtitle': 'Product P0016 is running low (74 remaining)',
+      'time': 'Just now',
+      'read': false
+    },
+    {
+      'title': 'Low Stock Alert',
+      'subtitle': 'Product P0003 is running low (69 remaining)',
+      'time': 'Just now',
+      'read': false
+    },
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Notifications', style: Theme.of(context).textTheme.headlineMedium),
+        const SizedBox(height: 12),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: [
+                for (int i = 0; i < alerts.length; i++)
+                  ListTile(
+                    leading: const Icon(Icons.notifications),
+                    title: Text(alerts[i]['title']!),
+                    subtitle: Row(
+                      children: [
+                        Expanded(child: Text('${alerts[i]['subtitle']} • ${alerts[i]['time']}')),
+                        if (alerts[i]['read'] == true)
+                          const Icon(Icons.done_all, color: Colors.blue, size: 16),
+                      ],
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              alerts[i]['read'] = true; // mark as read
+                            });
+                          },
+                          child: const Text('Mark as read'),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              alerts.removeAt(i); // delete notification
+                            });
+                          },
+                          child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 // ------------------------------ PROFILE PAGE ------------------------------
 
 class ProfileWidget extends StatefulWidget {
@@ -944,10 +1027,21 @@ class AnalysisWidget extends StatelessWidget {
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
       ),
-      body: const Center(
-        child: Text(
-          "Analysis page (content will be added later)",
-          style: TextStyle(color: Colors.black54),
+      body: Center(
+        child: TextButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => Analysispage()), // ✅ navigate to analysis page
+            );
+          },
+          child: Text(
+            'Go to Analysis',
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium!
+                .copyWith(color: Colors.grey[600]),
+          ),
         ),
       ),
     );

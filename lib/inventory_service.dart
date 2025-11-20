@@ -6,7 +6,7 @@ import 'product_model.dart';
 class InventoryService {
   // CRITICAL: Use the correct base URL for your device/emulator!
   // Android Emulator: 10.0.2.2 | iOS Simulator/Device: localhost or IP
-  final String baseUrl = 'http://10.0.2.2:8000'; 
+  final String baseUrl = 'http://192.168.42.146:8000'; 
   final String productsEndpoint = '/inventory/products';
 
   Future<List<Product>> fetchAllProducts() async {
