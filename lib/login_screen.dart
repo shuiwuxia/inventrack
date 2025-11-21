@@ -20,7 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
 
   // IMPORTANT: Use the correct base URL for your local FastAPI server
-  static const String _baseUrl = 'http://inventrack-backend-1.onrender.com';
+  static const String _baseUrl = 'https://inventrack-backend-1.onrender.com';
   static const String _loginEndpoint = '/auth/login'; 
 
 

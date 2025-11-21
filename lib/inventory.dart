@@ -64,7 +64,7 @@ class _InventoryPageState extends State<InventoryPage> {
   Future<void> _fetchProducts() async {
     if (widget.storeId.isEmpty) return;
     setState(() => loading = true);
-    final String apiUrl = "http://inventrack-backend-1.onrender.com/inventory/${widget.storeId}/products";
+    final String apiUrl = "https://inventrack-backend-1.onrender.com/inventory/${widget.storeId}/products";
 
     try {
       final response = await http.get(Uri.parse(apiUrl));
@@ -431,7 +431,7 @@ class _InventoryPageState extends State<InventoryPage> {
 
   // FIX: This function now receives the corrected payload from _editPanel
   Future<void> _addProductToAPI(Map<String, dynamic> product) async {
-    final String apiUrl = "http://inventrack-backend-1.onrender.com/products/${widget.storeId}/"; // NOTE: Should use /products/{store_id}/
+    final String apiUrl = "https://inventrack-backend-1.onrender.com/products/${widget.storeId}/"; // NOTE: Should use /products/{store_id}/
     
     try {
       final response = await http.post(Uri.parse(apiUrl),
@@ -450,7 +450,7 @@ class _InventoryPageState extends State<InventoryPage> {
   // FIX: This function now uses the correct method and URL
   Future<void> _updateProductToAPI(String productId, Map<String, dynamic> updated) async {
     // FIX 1: Correct the API URL to include productId
-    final String apiUrl = "http://inventrack-backend-1.onrender.com/inventory/${widget.storeId}/$productId"; 
+    final String apiUrl = "https://inventrack-backend-1.onrender.com/inventory/${widget.storeId}/$productId"; 
     
     try {
       // FIX 2: Change from http.put to http.patch to match the FastAPI router
@@ -477,7 +477,7 @@ class _InventoryPageState extends State<InventoryPage> {
     if (result != null) {
       final PlatformFile platformFile = result.files.single;
       
-      final uri = Uri.parse("http://inventrack-backend-1.onrender.com/inventory/${widget.storeId}/upload_csv");
+      final uri = Uri.parse("https://inventrack-backend-1.onrender.com/inventory/${widget.storeId}/upload_csv");
       
       var request = http.MultipartRequest('POST', uri);
       

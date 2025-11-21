@@ -44,7 +44,7 @@ class _POSState extends State<POS> {
   /// ✅ Fetch products from backend API
   Future<void> fetchProducts() async {
     const storeId = 'S1001';
-    final url = Uri.parse('http://inventrack-backend-1.onrender.com/inventory/$storeId/products');
+    final url = Uri.parse('https://inventrack-backend-1.onrender.com/inventory/$storeId/products');
 
     try {
       final response = await http.get(url);

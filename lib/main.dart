@@ -90,7 +90,7 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false;
 
   Future<void> _login() async {
-    const String apiUrl = "http://inventrack-backend-1.onrender.com/auth/login"; // FastAPI endpoint 
+    const String apiUrl = "https://inventrack-backend-1.onrender.com/auth/login"; // FastAPI endpoint 
    
 
     setState(() => _isLoading = true);
@@ -217,7 +217,7 @@ class _SignupPageState extends State<SignupPage> {
 
     setState(() => _isLoading = true);
 
-    final url = Uri.parse("http://inventrack-backend-1.onrender.com/auth/register/shopkeeper"); // FastAPI endpoint
+    final url = Uri.parse("https://inventrack-backend-1.onrender.com/auth/register/shopkeeper"); // FastAPI endpoint
     
 
     final body = {

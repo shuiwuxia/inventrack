@@ -178,7 +178,7 @@ class ApiService {
 
   // --- MODIFIED: Implemented to fetch live shop data ---
   static Future<List<Shop>> fetchShops() async {
-    final url = Uri.parse('http://inventrack-backend-1.onrender.com/shops/all');
+    final url = Uri.parse('https://inventrack-backend-1.onrender.com/shops/all');
    
     try {
       final response = await http.get(url, headers: headers);
