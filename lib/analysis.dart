@@ -228,17 +228,12 @@ class _AnalysispageState extends State<Analysispage> {
   List<Map<String, dynamic>> _restockAlerts = [];
   // ignore: unused_field
   List<Map<String, dynamic>> _salesTrendData = [];
-  List<String> _forecastDates = []; // To hold date labels for the X-axis
-  Map<String, dynamic>? _overallKpis; // To hold overall KPI data
+  List<String> _forecastDates = []; 
+  Map<String, dynamic>? _overallKpis; 
   bool _isLoading = false;
+  final String baseUrl = "https://inventrack-backend-1.onrender.com"; 
+  final String storeId = "S1001"; 
 
-  // For mobile testing, replace with your computer's IP address (run 'ipconfig' on Windows or 'ifconfig' on Mac/Linux)
-  // Example: "http://192.168.1.100:8000" - use your actual local IP, not 192.168.42.146
-  // Or use ngrok/localtunnel to expose your local server: "https://your-ngrok-url.ngrok.io"
-  final String baseUrl = "http://192.168.42.146:8000"; // Update this IP for mobile testing
-  final String storeId = "S1001"; // Hardcoded store ID for the API calls
-
-  // Define a set of distinct colors for the different lines
   final List<Color> chartColors = [
     Colors.deepPurple,
     Colors.orange,

@@ -31,7 +31,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   bool _isLoading = false;
 
   // Constants for API access
-  static const String _baseUrl = 'http://192.168.42.146:8000';
+  static const String _baseUrl = 'http://inventrack-backend-1.onrender.com';
   static const String _registerEndpoint = '/auth/register';
 
 

@@ -159,7 +159,7 @@ class ApiService {
 
   // --- MODIFIED: Implemented to fetch live product data ---
   static Future<List<Product>> fetchProducts({String? searchQuery, bool? onlyLowStock, bool? onlyHighDemand}) async {
-    final url = Uri.parse('http://192.168.42.146:8000/products/all');
+    final url = Uri.parse('https://inventrack-backend-1.onrender.com/products/all');
    
     try {
       final response = await http.get(url, headers: headers);
@@ -178,7 +178,7 @@ class ApiService {
 
   // --- MODIFIED: Implemented to fetch live shop data ---
   static Future<List<Shop>> fetchShops() async {
-    final url = Uri.parse('http://192.168.42.146:8000/shops/all');
+    final url = Uri.parse('http://inventrack-backend-1.onrender.com/shops/all');
    
     try {
       final response = await http.get(url, headers: headers);
